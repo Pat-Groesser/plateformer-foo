@@ -1,7 +1,6 @@
 local sprites = {}
 
 sprites.coin = love.graphics.newImage('sprites/coin_sheet.png')
-sprites.player_jump = love.graphics.newImage('sprites/player_jump.png')
-sprites.player_stand = love.graphics.newImage('sprites/player_stand.png')
+sprites.player_sheet = love.graphics.newImage('sprites/cat_happy_sheet.png')
 
 return sprites

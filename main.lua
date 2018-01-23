@@ -1,82 +1,72 @@
 function love.load()
-  -- Set up variables
   -- Libraries
   require 'libraries/serialize/show'
   anim8 = require 'libraries/anim8/anim8'
   sti = require 'libraries/sti'
   cameraLib = require 'libraries/hump/camera'
   sprites = require 'sprites'
-  love.window.setMode(900, 700)
+  -- Window
+  love.window.setMode(1280, 720)
   love.graphics.setBackgroundColor(155, 214, 255)
-
   -- World
-  world = love.physics.newWorld(0, 700, false)
+  world = love.physics.newWorld(0, 900, false)
   world:setCallbacks(beginContact, endContact, preSolve, postSolve)
   -- Objects
-  require 'player'
-  require 'coin'
-
+  player = require 'player'
+  coins = require 'coins'
+  -- Sound
   sounds = {}
   sounds.coinCollect = love.audio.newSource('sounds/coin_collect.wav')
   sounds.mapLvl1 = love.audio.newSource('sounds/map_lvl1_sound.ogg')
   lvlSoundRunning = false
-
+  --States
   gameStates = {}
   gameStates.PRE_PLAY = 1
   gameStates.PLAY = 2
-
   gameState = gameStates.PRE_PLAY
+  -- UI
   menuFont = love.graphics.newFont(30)
   timer = 0
-
   savedData = {}
   savedData.bestTime = 999
-
   if love.filesystem.exists("savedData.lua") then
     local data = love.filesystem.load("savedData.lua")
     data()
   end
-
+  -- Set up
   cam = cameraLib()
   platforms = {}
-  gameMap = sti("maps/map_lvl1_tile_map.lua")
-  for i, obj in pairs(gameMap.layers['Platforms'].objects) do
+  gameMap = sti("maps/tiles_sheet_platformer.lua")
+  for i, obj in pairs(gameMap.layers['platforms_obj'].objects) do
     spawnPlatform(obj.x, obj.y, obj.width, obj.height)
   end
-
-  for i, obj in pairs(gameMap.layers['Coins'].objects) do
-    spawnCoin(obj.x, obj.y)
-  end
+  coins:load()
 end
 
 function love.update(dt)
   world:update(dt)
-  playerUpdate(dt)
   gameMap:update(dt)
-  coinsUpdate(dt)
+  cam:lookAt(player.body:getX(), love.graphics:getHeight()/2)
+  player:update(dt)
+  coins:update(dt)
 
-  cam:lookAt(player.body:getX(), love.graphics.getHeight()/2)
-
-  for i, c in ipairs(coins) do
-    c.animation:update(dt)
-  end
   if gameState == gameStates.PLAY then
     timer = timer + dt
     if lvlSoundRunning == false then
       sounds.mapLvl1:play()
-      sounds.mapLvl1:setVolume(0.25)
+      sounds.mapLvl1:setVolume(0.1)
       lvlSoundRunning = true
     end
   end
 
-  if #coins == 0 and gameState == gameStates.PLAY then
+  if #coins.bag == 0 and gameState == gameStates.PLAY then
     resetLvl()
     if timer < savedData.bestTime then
-        saveTimer()
+        saveTimer(timer)
     end
   end
 
-  if player.dead == true then
+  if player.state == 'dead' then
     resetLvl()
   end
 
@@ -85,13 +75,9 @@ end
 function love.draw()
   cam:attach()
 
-  gameMap:drawLayer(gameMap.layers['TilesLayer'])
-
-  love.graphics.draw(player.sprite, player.body:getX(), player.body:getY(), nil, player.direction, 1, sprites.player_stand:getWidth()/2, sprites.player_stand:getHeight()/2)
-
-  for i, c in ipairs(coins) do
-    c.animation:draw(sprites.coin, c.x, c.y, nil, nil, nil, 20.5, 21)
-  end
+  gameMap:drawLayer(gameMap.layers['tiles_layer'])
+  player:draw()
+  coins:draw()
 
   cam:detach()
   if gameState == gameStates.PRE_PLAY then
@@ -103,9 +89,6 @@ function love.draw()
 end
 
 function love.keypressed(key, scancode, isrepeat)
-  if key == "up" and player.grounded == true then
-    player.body:applyLinearImpulse(0, player.impulse)
-  end
   if gameState == gameStates.PRE_PLAY then
     gameState = gameStates.PLAY
     timer = 0
@@ -121,6 +104,7 @@ function spawnPlatform(x, y, width, height)
   platform.body = love.physics.newBody(world, x, y, "static")
   platform.shape = love.physics.newRectangleShape(width/2, height/2, width, height)
   platform.fixture = love.physics.newFixture(platform.body, platform.shape)
+  platform.fixture:setUserData('Platform')
   platform.width = width
   platform.height = height
 
@@ -128,7 +112,17 @@ function spawnPlatform(x, y, width, height)
 end
 
 function beginContact(a, b, coll)
-  player.grounded = true
+  -- Prevent wall glitch
+  if 'Player' == a:getUserData() and 'Platform' == b:getUserData() then
+    local platformBody = b:getBody()
+    playerFeetPosition = player.body:getY() + player.hitbox.height/2
+    platformTopPosition = platformBody:getY()
+    if playerFeetPosition < platformTopPosition then
+      player.grounded = true
+    end
+  end
+
+
 end
 
 function endContact(a, b, coll)
@@ -142,10 +136,8 @@ end
 
 function resetLvl ()
   gameState = gameStates.PRE_PLAY
-  resetPlayer()
-  for i, obj in pairs(gameMap.layers['Coins'].objects) do
-    spawnCoin(obj.x, obj.y, obj.width, obj.height)
-  end
+  player:reset()
+  coins:load()
   sounds.mapLvl1:stop()
   lvlSoundRunning = false
 end

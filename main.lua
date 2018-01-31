@@ -14,6 +14,9 @@ function love.load()
   -- Objects
   player = require 'player'
   coins = require 'coins'
+  platforms = require 'platforms'
+  fallingPlatforms = require 'fallingPlatforms'
+
   -- Sound
   sounds = {}
   sounds.coinCollect = love.audio.newSource('sounds/coin_collect.wav')
@@ -35,11 +38,9 @@ function love.load()
   end
   -- Set up
   cam = cameraLib()
-  platforms = {}
   gameMap = sti("maps/tiles_sheet_platformer.lua")
-  for i, obj in pairs(gameMap.layers['platforms_obj'].objects) do
-    spawnPlatform(obj.x, obj.y, obj.width, obj.height)
-  end
+  platforms:load()
+  fallingPlatforms:load()
   coins:load()
 end
 
@@ -48,6 +49,7 @@ function love.update(dt)
   gameMap:update(dt)
   cam:lookAt(player.body:getX(), love.graphics:getHeight()/2)
   player:update(dt)
+  fallingPlatforms:update(dt)
   coins:update(dt)
 
   if gameState == gameStates.PLAY then
@@ -65,7 +67,6 @@ function love.update(dt)
         saveTimer(timer)
     end
   end
-
   if player.state == 'dead' then
     resetLvl()
   end
@@ -74,12 +75,12 @@ end
 
 function love.draw()
   cam:attach()
-
   gameMap:drawLayer(gameMap.layers['tiles_layer'])
   player:draw()
+  fallingPlatforms:draw()
   coins:draw()
-
   cam:detach()
+
   if gameState == gameStates.PRE_PLAY then
       love.graphics.setFont(menuFont)
       love.graphics.printf("Press any button to begin !", 0, 50, love.graphics.getWidth(), "center")
@@ -99,30 +100,28 @@ function getDistanceBetween(y1, x1, y2, x2)
   return math.sqrt((y2 - y1)^2 + (x2 - x1)^2)
 end
 
-function spawnPlatform(x, y, width, height)
-  local platform = {}
-  platform.body = love.physics.newBody(world, x, y, "static")
-  platform.shape = love.physics.newRectangleShape(width/2, height/2, width, height)
-  platform.fixture = love.physics.newFixture(platform.body, platform.shape)
-  platform.fixture:setUserData('Platform')
-  platform.width = width
-  platform.height = height
-
-  table.insert(platforms, platform)
-end
-
 function beginContact(a, b, coll)
-  -- Prevent wall glitch
   if 'Player' == a:getUserData() and 'Platform' == b:getUserData() then
     local platformBody = b:getBody()
     playerFeetPosition = player.body:getY() + player.hitbox.height/2
     platformTopPosition = platformBody:getY()
+    -- Prevent wall glitch
     if playerFeetPosition < platformTopPosition then
       player.grounded = true
     end
   end
-
-
+  if 'Player' == a:getUserData() and 'FallingPlatform' == b:getUserData() then
+    currentContactPlatform = fallingPlatforms:getPlatform(b:getBody():getX(), b:getBody():getY())
+    if currentContactPlatform ~= nil then
+      playerFeetPosition = player.body:getY() + player.hitbox.height/2
+      -- Prevent wall glitch
+      if playerFeetPosition < currentContactPlatform.body:getY() then
+        player.grounded = true
+        currentContactPlatform.sprite = sprites.fallingPlatformDead
+        currentContactPlatform.hit = true
+      end
+    end
+  end
 end
 
 function endContact(a, b, coll)
@@ -138,6 +137,7 @@ function resetLvl ()
   gameState = gameStates.PRE_PLAY
   player:reset()
   coins:load()
+  fallingPlatforms:load()
   sounds.mapLvl1:stop()
   lvlSoundRunning = false
 end

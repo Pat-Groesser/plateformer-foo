@@ -7,8 +7,8 @@ player.hitbox.height = 73
 player.shape = love.physics.newRectangleShape(player.hitbox.width, player.hitbox.height)
 player.fixture = love.physics.newFixture(player.body, player.shape)
 player.fixture:setUserData('Player')
-player.speed = 500
-player.impulse = -1300
+player.speed = 450
+player.impulse = -1180
 player.grounded = false
 player.state = 'idle'
 player.direction = 1 -- right / -1 -- left
@@ -33,7 +33,7 @@ end
 
 local function checkPlayerPosition()
   if player.body:getY() > love.graphics.getHeight() then
-    player.sate = 'dead'
+    player.state = 'dead'
   end
 end
 
@@ -45,7 +45,6 @@ function player:update(dt)
         player.body:applyLinearImpulse(0, player.impulse)
       end
     end
-
     if love.keyboard.isDown("left") then
       updatePlayerRunning(dt, -1)
     end
@@ -57,6 +56,7 @@ function player:update(dt)
     if 'idle' == player.state then
         player.animations.walking:gotoFrame(1)
     end
+    checkPlayerPosition()
   end
 end
 

@@ -16,6 +16,7 @@ function love.load()
   coins = require 'coins'
   platforms = require 'platforms'
   fallingPlatforms = require 'fallingPlatforms'
+  boss = require 'boss'
 
   -- Sound
   sounds = {}
@@ -42,6 +43,7 @@ function love.load()
   platforms:load()
   fallingPlatforms:load()
   coins:load()
+  boss:load()
 end
 
 function love.update(dt)
@@ -51,6 +53,7 @@ function love.update(dt)
   player:update(dt)
   fallingPlatforms:update(dt)
   coins:update(dt)
+  boss:update(dt)
 
   if gameState == gameStates.PLAY then
     timer = timer + dt
@@ -79,7 +82,9 @@ function love.draw()
   player:draw()
   fallingPlatforms:draw()
   coins:draw()
+  boss:draw()
   cam:detach()
+
 
   if gameState == gameStates.PRE_PLAY then
       love.graphics.setFont(menuFont)
@@ -101,6 +106,7 @@ function getDistanceBetween(y1, x1, y2, x2)
 end
 
 function beginContact(a, b, coll)
+  print(b:getUserData()) --debug
   if 'Player' == a:getUserData() and 'Platform' == b:getUserData() then
     local platformBody = b:getBody()
     playerFeetPosition = player.body:getY() + player.hitbox.height/2
